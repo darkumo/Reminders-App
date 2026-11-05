@@ -582,6 +582,33 @@ jobs:
                   }
                 });
               }
+              @JavascriptInterface public int buildNumber() {
+                try {
+                  android.content.pm.PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+                  return Build.VERSION.SDK_INT >= 28 ? (int) pi.getLongVersionCode() : pi.versionCode;
+                } catch (Exception e) { return 0; }
+              }
+              // asks GitHub for the latest release (public API, no account needed) and hands the answer to the page
+              @JavascriptInterface public void checkUpdate(String api) {
+                new Thread(() -> {
+                  String res = "";
+                  try {
+                    java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(api).openConnection();
+                    c.setRequestProperty("Accept", "application/vnd.github+json");
+                    c.setRequestProperty("User-Agent", "Reminders-App");
+                    c.setConnectTimeout(10000); c.setReadTimeout(10000);
+                    if (c.getResponseCode() == 200) {
+                      java.io.InputStream in = c.getInputStream();
+                      java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+                      byte[] buf = new byte[8192]; int n;
+                      while ((n = in.read(buf)) > 0) o.write(buf, 0, n);
+                      res = o.toString("UTF-8");
+                    }
+                  } catch (Exception e) { }
+                  final String r = res;
+                  runOnUiThread(() -> js("window.onUpdateInfo&&onUpdateInfo(" + JSONObject.quote(r) + ")"));
+                }).start();
+              }
               @JavascriptInterface public void openUrl(String u) {
                 runOnUiThread(() -> { try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(u))); } catch (Exception e) { } });
               }
@@ -618,10 +645,12 @@ jobs:
       - name: Compilar
         run: gradle :app:assembleDebug --no-daemon
       - name: Renombrar
-        run: cp app/build/outputs/apk/debug/app-debug.apk Recordatorios.apk
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk Recordatorios.apk
+          echo "VER=$(grep -o "const VERSION='[^']*'" index.html | cut -d"'" -f2)" >> $GITHUB_ENV
       - name: Publicar descarga
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
-          name: Recordatorios (build ${{ github.run_number }})
+          name: Reminders v${{ env.VER }} (build ${{ github.run_number }})
           files: Recordatorios.apk
