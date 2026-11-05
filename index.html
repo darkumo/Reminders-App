@@ -130,7 +130,8 @@ body.light .cat,body.light .item,body.light .sugg,body.light .field{box-shadow:0
 <div class="menu" id="menu"></div>
 
 <script>
-const VERSION='1.3.1';
+const VERSION='1.4';
+const REPO='https://github.com/darkumo/Reminders-App';
 const AB=window.AndroidBridge||null;
 const ICON={
  today:'<svg width="30" height="30" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3" fill="#ff6b6b"/><rect x="3" y="5" width="18" height="5" rx="2" fill="#ff8585"/><rect x="7" y="2.5" width="2" height="5" rx="1" fill="#ff6b6b"/><rect x="15" y="2.5" width="2" height="5" rx="1" fill="#ff6b6b"/><circle cx="8" cy="14" r="1.6" fill="#fff"/></svg>',
@@ -393,6 +394,22 @@ window.onAndroidBack=function(){
  if(view!=='home'){view='home';q='';render();return true}
  return false;
 };
+function openAbout(){
+ editing={about:true};openScrim();
+ $('sheet').innerHTML=`<div class="grab"></div>
+ <div style="text-align:center;padding:8px 0 4px">
+  <svg width="76" height="76" viewBox="0 0 48 48" style="border-radius:20px"><rect width="48" height="48" rx="12" fill="#2a2647"/><circle cx="24" cy="22" r="12" fill="#8b7bff"/><path d="M19.5 22.3l2.9 2.9 6.2-6.4 1.8 1.8-8 8.2-4.7-4.7z" fill="#fff"/></svg>
+  <div style="font-size:24px;font-weight:700;margin-top:12px">Reminders</div>
+  <div style="color:var(--mut);margin-top:4px">${L('Versión','Version')} ${VERSION}</div>
+ </div>
+ <div class="field"><div class="srow"><span>${L('Creado por','Made by')}</span><b>darkumo</b></div>
+  <div class="srow"><span>${L('Licencia','License')}</span><b>MIT</b></div></div>
+ <div class="acts"><button class="save" id="aGit" style="display:flex;align-items:center;justify-content:center;gap:8px">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.6 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5z"/></svg>
+  ${L('Ver en GitHub','View on GitHub')}</button></div>`;
+ $('aGit').onclick=()=>{try{if(AB&&AB.openUrl){AB.openUrl(REPO);return}}catch(e){}window.open(REPO,'_blank')};
+ requestAnimationFrame(()=>$('sheet').classList.add('open'));
+}
 function openSettings(){
  editing={settings:true};openScrim();
  const s=db.settings,seg=(k,opts)=>`<div class="seg">${opts.map(([v,l])=>`<button data-set="${k}" data-v="${v}" class="${String(s[k])===String(v)?'on':''}">${l}</button>`).join('')}</div>`;
@@ -446,7 +463,7 @@ $('app').addEventListener('click',ev=>{
  if(k==='emptyTrash'){db.trash=[];save();render();return}
  if(k==='clearDone'){db.items=db.items.filter(x=>!x.done);save();render();return}
  if(k==='more'){if(menuOpen()){closeMenu();return}const m=$('menu'),r=a.getBoundingClientRect();
-  m.innerHTML=`<button data-m="settings">${L('Ajustes','Settings')}</button>${db.settings.trash?`<button data-m="trash">${L('Papelera','Trash')}</button>`:''}<button data-m="sugg">${db.hideSugg?L('Mostrar sugerencias','Show suggestions'):L('Ocultar sugerencias','Hide suggestions')}</button><button data-m="export">${L('Copiar copia de seguridad','Copy backup')}</button><button data-m="import">${L('Restaurar copia','Restore backup')}</button>`;
+  m.innerHTML=`<button data-m="settings">${L('Ajustes','Settings')}</button>${db.settings.trash?`<button data-m="trash">${L('Papelera','Trash')}</button>`:''}<button data-m="sugg">${db.hideSugg?L('Mostrar sugerencias','Show suggestions'):L('Ocultar sugerencias','Hide suggestions')}</button><button data-m="export">${L('Copiar copia de seguridad','Copy backup')}</button><button data-m="import">${L('Restaurar copia','Restore backup')}</button><button data-m="about">${L('Acerca de','About')}</button>`;
   m.style.display='block';m.style.top=(r.bottom+4)+'px';m.style.left=Math.max(8,r.right-220)+'px';requestAnimationFrame(()=>m.classList.add('show'));return}
 });
 function menuOpen(){return $('menu').style.display==='block'}
@@ -462,6 +479,7 @@ $('menu').addEventListener('click',async ev=>{const b=ev.target.closest('[data-m
   if($('rPaste'))$('rPaste').onclick=()=>{try{$('rTxt').value=AB.getClip()}catch(e){}};
   $('rC').onclick=closeEditor;$('rOk').onclick=()=>{try{const x=JSON.parse($('rTxt').value);if(!Array.isArray(x.items))throw 0;const st=db.settings;db=x;db.settings=x.settings||st;save();applyTheme();closeEditor();render();toast(L('Copia restaurada','Backup restored'))}catch(e){toast(L('Ese texto no es una copia válida',"That isn't a valid backup"))}}}
  if(b.dataset.m==='settings')openSettings();
+ if(b.dataset.m==='about')openAbout();
  if(b.dataset.m==='trash'){view='trash';render();scrollTo(0,0)}
 });
 $('scrim').onclick=closeEditor;
