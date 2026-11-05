@@ -522,7 +522,13 @@ jobs:
               st.setDomStorageEnabled(true);
               st.setMediaPlaybackRequiresUserGesture(false);
               w.addJavascriptInterface(new Bridge(), "AndroidBridge");
-              w.setWebViewClient(new WebViewClient());
+              w.setWebViewClient(new WebViewClient() {
+                @Override public boolean shouldOverrideUrlLoading(WebView v, android.webkit.WebResourceRequest r) {
+                  String s = r.getUrl().toString();
+                  if (s.startsWith("http")) { try { startActivity(new Intent(Intent.ACTION_VIEW, r.getUrl())); } catch (Exception e) { } return true; }
+                  return false;
+                }
+              });
               w.loadUrl("file:///android_asset/index.html");
               if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
                 requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
@@ -575,6 +581,9 @@ jobs:
                     try { startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()))); } catch (Exception x) { }
                   }
                 });
+              }
+              @JavascriptInterface public void openUrl(String u) {
+                runOnUiThread(() -> { try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(u))); } catch (Exception e) { } });
               }
               @JavascriptInterface public void setClip(String s) {
                 ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
