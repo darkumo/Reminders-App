@@ -117,9 +117,56 @@ body.light .cat,body.light .item,body.light .sugg,body.light .field{box-shadow:0
 .cat,.item,.sugg,.pill,.btn,.ib{transition-property:transform,opacity,background,max-height,margin,padding}
 .item:active{transform:scale(.985)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+/* sticky top bar (all styles) */
+.topbar{position:fixed;top:0;left:0;right:0;z-index:6;display:flex;justify-content:space-between;align-items:center;padding:6px 10px 6px 22px;max-width:560px;margin:0 auto;
+ background:var(--bg2);border-bottom:1px solid transparent;transform:translateY(-110%);transition:transform .25s ease,background .25s}
+.topbar .tbt{font-weight:700;font-size:19px}
+.topbar>span:last-child{display:flex;gap:2px}
+body.scrolled .topbar{transform:none;border-bottom-color:var(--ln)}
+/* ---------- glass styles ---------- */
+.bgorbs{display:none}
+body.glass .bgorbs{display:block;position:fixed;inset:0;z-index:-1;pointer-events:none;
+ background:radial-gradient(40% 30% at 18% 22%,rgba(139,123,255,.55),transparent 70%),radial-gradient(35% 28% at 85% 40%,rgba(79,209,197,.35),transparent 70%),radial-gradient(45% 35% at 50% 92%,rgba(224,80,143,.35),transparent 70%)}
+body.light.glass .bgorbs{opacity:.7}
+body.glass{--gl:rgba(30,30,44,.42);--gl2:rgba(40,40,58,.55);--gb:rgba(255,255,255,.10)}
+body.light.glass{--gl:rgba(255,255,255,.50);--gl2:rgba(255,255,255,.68);--gb:rgba(255,255,255,.65)}
+body.glass .fab,body.glass .menu,body.glass .topbar,body.glass .alert,body.glass .top{background:var(--gl2);border:1px solid var(--gb);
+ -webkit-backdrop-filter:blur(22px) saturate(170%);backdrop-filter:blur(22px) saturate(170%)}
+body.glass .sheet{background:var(--gl2);-webkit-backdrop-filter:blur(28px) saturate(170%);backdrop-filter:blur(28px) saturate(170%);border-top:1px solid var(--gb)}
+body.glass .cat,body.glass .item,body.glass .sugg{background:var(--gl);border:1px solid var(--gb);-webkit-backdrop-filter:blur(14px) saturate(150%);backdrop-filter:blur(14px) saturate(150%)}
+body.glass .field{background:rgba(127,127,160,.12)}
+body.glass .scrim{background:rgba(0,0,0,.35)}
+/* liquid glass: rim highlight + inner glow + edge refraction */
+body.g-liquid .fab,body.g-liquid .menu,body.g-liquid .topbar,body.g-liquid .cat,body.g-liquid .item,body.g-liquid .sugg,body.g-liquid .alert{
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -1px 0 rgba(255,255,255,.08),inset 0 0 22px rgba(255,255,255,.05),0 10px 30px rgba(0,0,0,.25)}
+body.g-liquid .sheet{box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 -10px 40px rgba(0,0,0,.3)}
+body.g-liquid .cat,body.g-liquid .item,body.g-liquid .sugg{position:relative}
+body.g-liquid .fab::after,body.g-liquid .menu::after,body.g-liquid .cat::after,body.g-liquid .item::after,body.g-liquid .sugg::after{content:'';position:absolute;inset:0;border-radius:inherit;padding:1.2px;pointer-events:none;
+ background:linear-gradient(135deg,rgba(255,255,255,.6),rgba(255,255,255,.08) 30%,rgba(255,255,255,0) 55%,rgba(255,255,255,.22) 85%,rgba(255,255,255,.45));
+ -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+body.g-liquid .fab,body.g-liquid .menu,body.g-liquid .topbar{-webkit-backdrop-filter:blur(16px) saturate(190%) brightness(1.08);backdrop-filter:url(#lgRefract) blur(16px) saturate(190%) brightness(1.08)}
+body.g-liquid .fab{border-radius:40px}
+body.g-liquid .chk{box-shadow:inset 0 1px 0 rgba(255,255,255,.25)}
+body.g-liquid .pill.on,body.g-liquid .seg button.on,body.g-liquid .save{box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 4px 14px rgba(139,123,255,.35)}
+body.light.g-liquid .fab,body.light.g-liquid .menu,body.light.g-liquid .topbar,body.light.g-liquid .cat,body.light.g-liquid .item,body.light.g-liquid .sugg{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 8px 24px rgba(60,40,140,.12)}
+
+body.glass .menu{position:fixed;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -1px 0 rgba(255,255,255,.08),inset 0 0 22px rgba(255,255,255,.05),0 10px 30px rgba(0,0,0,.25);
+ -webkit-backdrop-filter:blur(16px) saturate(190%) brightness(1.08);backdrop-filter:url(#lgRefract) blur(16px) saturate(190%) brightness(1.08)}
+body.glass .menu::after{content:'';position:absolute;inset:0;border-radius:inherit;padding:1.2px;pointer-events:none;
+ background:linear-gradient(135deg,rgba(255,255,255,.6),rgba(255,255,255,.08) 30%,rgba(255,255,255,0) 55%,rgba(255,255,255,.22) 85%,rgba(255,255,255,.45));
+ -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+body.light.glass .menu{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 8px 24px rgba(60,40,140,.12)}
+.upd{display:flex;align-items:center;gap:8px;background:color-mix(in srgb,var(--acc) 18%,var(--card));border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);color:var(--tx);border-radius:16px;padding:6px 6px 6px 12px;margin:0 2px 10px;font-size:13.5px;animation:updIn .35s ease}
+.upd svg{color:var(--acc);flex:none}
+.upd .ul{flex:1;min-width:0;text-align:left;background:none;border:none;color:var(--tx);font:600 13.5px Inter,sans-serif;padding:6px 0;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.upd .ux{flex:none;background:none;border:none;color:var(--mut);font:500 12.5px Inter,sans-serif;padding:6px 8px;cursor:pointer;white-space:nowrap}
+@keyframes updIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="lgRefract" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.018" numOctaves="2" seed="7" result="n"/><feGaussianBlur in="n" stdDeviation="2" result="nb"/><feDisplacementMap in="SourceGraphic" in2="nb" scale="22" xChannelSelector="R" yChannelSelector="G"/></filter></svg>
+<div class="bgorbs" aria-hidden="true"></div>
 <div class="wrap" id="app"></div>
 <button class="top" id="toTop" aria-label="Arriba"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5h14M12 20V9M7 13l5-5 5 5"/></svg></button>
 <div class="fab"><input id="quick" placeholder="Añadir recordatorio" enterkeyhint="done"><button id="quickGo" aria-label="Añadir"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button></div>
@@ -130,7 +177,7 @@ body.light .cat,body.light .item,body.light .sugg,body.light .field{box-shadow:0
 <div class="menu" id="menu"></div>
 
 <script>
-const VERSION='1.4';
+const VERSION='1.6';
 const REPO='https://github.com/darkumo/Reminders-App';
 const AB=window.AndroidBridge||null;
 const ICON={
@@ -152,8 +199,9 @@ const ICON={
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 let db=store.get('rem_db')||{items:[],completedCount:0,hideSugg:false};
 if(!db.settings)db.settings={lang:'auto',theme:'dark'};
-db.settings=Object.assign({liveLead:15,alertType:'full',sound:'short',alertBg:'purple',dateOnlyTime:'09:00',presetTimes:true,stripTitle:false,pinImportant:false,autoDeleteDone:false,trash:true},db.settings);
+db.settings=Object.assign({updNotice:true,glass:'none',liveLead:15,alertType:'full',sound:'short',alertBg:'purple',dateOnlyTime:'09:00',presetTimes:true,stripTitle:false,pinImportant:false,autoDeleteDone:false,trash:true},db.settings);
 if(!db.trash)db.trash=[];
+if(db.settings.glass==='liquid')db.settings.glass='frost';
 db.trash=db.trash.filter(x=>Date.now()-x.deletedAt<30*864e5);
 // effective alert time: date-only reminders ring at the chosen time of that day
 const eff=it=>!it.due?null:it.dateOnly?it.due+(()=>{const[h,m]=(db.settings.dateOnlyTime||'09:00').split(':').map(Number);return(h*60+m)*6e4})():it.due;
@@ -274,8 +322,12 @@ function render(){
  const app=$('app');
  if(view==='home'){
   const g=groups(act);
-  let h=`<div class="hero"><h1>${L('Recordatorios','Reminders')}</h1></div>
+  let h=`<div class="topbar"><span class="tbt">${L('Recordatorios','Reminders')}</span><span><button class="ib" data-act="search" aria-label="Buscar">${ICON.search}</button><button class="ib" data-act="more" aria-label="Más">${ICON.more}</button></span></div>
+  <div class="hero"><h1>${L('Recordatorios','Reminders')}</h1></div>
   <div class="bar"><button class="ib" data-act="search" aria-label="Buscar">${ICON.search}</button><button class="ib" data-act="more" aria-label="Más">${ICON.more}</button></div>
+  ${upd&&db.settings.updNotice&&db.hideUpd!==upd.build?`<div class="upd"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+   <button class="ul" data-act="update">${L('Nueva versión','New version')} ${esc(upd.ver||'')} · <u>${L('Descargar','Download')}</u></button>
+   <button class="ux" data-act="hideupd">${L('No volver a mostrar',"Don't show again")}</button></div>`:''}
   <div class="grid">
    ${cat('today',L('Hoy','Today'),cnt.today)}${cat('sched',L('Programados','Scheduled'),cnt.sched)}${cat('imp',L('Importantes','Important'),cnt.imp)}
    ${cat('all',L('Todos','All'),cnt.all)}${cat('noal',L('Sin alerta','No alert'),cnt.noal)}${cat('done',L('Completados','Completed'),cnt.done)}
@@ -370,6 +422,7 @@ function drawSheet(){
 function applyTheme(){
  const t=db.settings.theme,dark=t==='dark'||(t==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);
  document.body.classList.toggle('light',!dark);
+ document.body.classList.toggle('g-frost',db.settings.glass==='frost');document.body.classList.toggle('glass',db.settings.glass!=='none');
  document.querySelector('meta[name=theme-color]').content=dark?'#0f0f18':'#f5f5f8';
  document.documentElement.lang=LANG();
  $('quick').placeholder=L('Añadir recordatorio','Add reminder');document.title=L('Recordatorios','Reminders');
@@ -381,6 +434,7 @@ function drawPerms(){const box=$('permBox');if(!box||!AB)return;let st={};try{st
  box.innerHTML=`<div class="lbl">${L('Permisos','Permissions')}</div>`+rows.map(([k,l])=>`<div class="srow"><div>${l}</div>${st[k]?`<span style="color:var(--acc);font-weight:600">✓</span>`:`<button class="pill" data-perm="${k}">${L('Permitir','Allow')}</button>`}</div>`).join('')+`<div class="s2" style="font-size:12.5px;color:var(--mut);margin-top:6px">${L('En HyperOS activa también "Inicio automático" para la app.','On HyperOS also turn on "Autostart" for the app.')}</div>`;
  box.querySelectorAll('[data-perm]').forEach(b=>b.onclick=()=>{AB.requestPerm(b.dataset.perm)});}
 window.onAndroidResume=function(){
+ try{if(db.settings.updNotice&&Date.now()-(db.lastUpdCheck||0)>6*36e5)setTimeout(checkUpdates,1500)}catch(e){}
  let acts=[];try{acts=JSON.parse(AB.takeActions()||'[]')}catch(e){}
  for(const a of acts){const it=db.items.find(x=>x.id===a.id);if(!it||it.done)continue;
   if(a.action==='COMPLETE')complete(it.id);
@@ -394,6 +448,23 @@ window.onAndroidBack=function(){
  if(view!=='home'){view='home';q='';render();return true}
  return false;
 };
+let upd=null; // {name,ver,url,build} — kept in db so the tab survives restarts
+try{if(db.upd&&AB&&db.upd.build>(+AB.buildNumber()||0))upd=db.upd}catch(e){}
+window.onUpdateInfo=function(s){
+ let r=null;try{r=JSON.parse(s)}catch(e){}
+ const box=$('updBox');
+ if(!r||!r.tag_name){upd=null;if(box)box.textContent=L('No se pudo revisar. ¿Tienes internet?',"Couldn't check. Are you online?");return}
+ const build=parseInt(String(r.tag_name).replace(/\D/g,''))||0,cur=+(AB.buildNumber&&AB.buildNumber())||0;
+ const apk=(r.assets||[]).find(a=>/\.apk$/i.test(a.name));
+ db.lastUpdCheck=Date.now();
+ const vm=String(r.name||'').match(/v\d+(\.\d+)*/);
+ upd=(build>cur&&apk)?{name:r.name||('build '+build),ver:vm?vm[0]:'',url:apk.browser_download_url,build}:null;
+ db.upd=upd;save();if(box)box.innerHTML=upd?`<b>${L('Nueva versión disponible','New version available')}</b> ${esc(upd.name)}`:L('Ya tienes la última versión','You have the latest version');
+ if(box&&upd)$('aUpd').textContent=L('Descargar actualización','Download update');
+ if(view==='home'&&!editing)render();
+};
+function checkUpdates(){try{if(AB&&AB.checkUpdate){AB.checkUpdate(REPO.replace('https://github.com/','https://api.github.com/repos/')+'/releases/latest');return true}}catch(e){}return false}
+function downloadUpdate(){if(!upd)return;try{AB.openUrl(upd.url)}catch(e){}}
 function openAbout(){
  editing={about:true};openScrim();
  $('sheet').innerHTML=`<div class="grab"></div>
@@ -404,9 +475,12 @@ function openAbout(){
  </div>
  <div class="field"><div class="srow"><span>${L('Creado por','Made by')}</span><b>darkumo</b></div>
   <div class="srow"><span>${L('Licencia','License')}</span><b>MIT</b></div></div>
+ ${AB?`<div class="field"><div id="updBox" style="font-size:14.5px">${upd?`<b>${L('Nueva versión disponible','New version available')}</b> ${esc(upd.name)}`:L('Toca para buscar actualizaciones','Tap to check for updates')}</div>
+  <button class="pill" id="aUpd" style="margin-top:10px">${upd?L('Descargar actualización','Download update'):L('Buscar actualizaciones','Check for updates')}</button></div>`:''}
  <div class="acts"><button class="save" id="aGit" style="display:flex;align-items:center;justify-content:center;gap:8px">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.6 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5z"/></svg>
   ${L('Ver en GitHub','View on GitHub')}</button></div>`;
+ if($('aUpd'))$('aUpd').onclick=()=>{if(upd){downloadUpdate();return}$('updBox').textContent=L('Buscando…','Checking…');checkUpdates()};
  $('aGit').onclick=()=>{try{if(AB&&AB.openUrl){AB.openUrl(REPO);return}}catch(e){}window.open(REPO,'_blank')};
  requestAnimationFrame(()=>$('sheet').classList.add('open'));
 }
@@ -417,7 +491,8 @@ function openSettings(){
  const BG={purple:'#5b4bd8',blue:'#2f7de1',green:'#1f9d6b',orange:'#f0793a',pink:'#e0508f',black:'#000'};
  $('sheet').innerHTML=`<div class="grab"></div><h3>${L('Ajustes','Settings')}</h3>
  <div class="field"><div class="lbl">${L('Idioma','Language')}</div>${seg('lang',[['auto',L('Del teléfono','Device')],['es','Español'],['en','English']])}</div>
- <div class="field"><div class="lbl">${L('Tema','Theme')}</div>${seg('theme',[['light',L('Día','Light')],['dark',L('Noche','Dark')],['auto',L('Automático','System')]])}</div>
+ <div class="field"><div class="lbl">${L('Tema','Theme')}</div>${seg('theme',[['light',L('Día','Light')],['dark',L('Noche','Dark')],['auto',L('Automático','System')]])}
+  <div class="lbl" style="margin-top:12px">${L('Estilo','Style')}</div>${seg('glass',[['none',L('Clásico','Classic')],['frost',L('Cristal difuminado','Frosted blur')]])}</div>
  <div class="sgh">${L('Alertas','Alerts')}</div>
  <div class="field"><div class="lbl">${L('Tipo de alerta','Alert type')}</div>${seg('alertType',[['full',L('Pantalla completa','Full screen')],['banner',L('Notificación','Notification')]])}
   <div class="lbl" style="margin-top:12px">${L('Sonido','Sound')}</div>${seg('sound',[['none',L('Sin sonido','None')],['short',L('Corto','Short')],['long',L('Largo','Long')]])}</div>
@@ -432,7 +507,8 @@ function openSettings(){
  <div class="sgh">${L('General','General')}</div>
  <div class="field">${tog('pinImportant',L('Fijar importantes arriba','Pin important reminders to top'))}
   ${tog('autoDeleteDone',L('Borrar recordatorios completados','Delete completed reminders'))}
-  ${tog('trash',L('Papelera','Trash'),L('Guarda los eliminados 30 días','Keep deleted reminders for 30 days'))}</div>
+  ${tog('trash',L('Papelera','Trash'),L('Guarda los eliminados 30 días','Keep deleted reminders for 30 days'))}
+  ${AB?tog('updNotice',L('Avisar de nuevas versiones','Notify about new versions'),L('Revisa GitHub al abrir la app','Checks GitHub when the app opens')):''}</div>
  <div class="acts"><button class="save" id="sOk">${L('Listo','Done')}</button></div>`;
  const sh=$('sheet'),keepScroll=()=>{const y=sh.scrollTop;openSettings();sh.scrollTop=y};
  sh.querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{s[b.dataset.set]=b.dataset.set==='liveLead'?+b.dataset.v:b.dataset.v;save();applyTheme();render();keepScroll()});
@@ -457,6 +533,8 @@ $('app').addEventListener('click',ev=>{
  const v=ev.target.closest('[data-view]');if(v){view=v.dataset.view;render();scrollTo(0,0);return}
  const s=ev.target.closest('[data-sugg]');if(s){const x=SUGG[+s.dataset.sugg];openEditor(null);Object.assign(editing,{title:x.title()},x.make());drawSheet();return}
  const a=ev.target.closest('[data-act]');if(!a)return;const k=a.dataset.act;
+ if(k==='update'){downloadUpdate();return}
+ if(k==='hideupd'){const el=a.closest('.upd');if(upd)db.hideUpd=upd.build;save();if(el){el.style.transition='opacity .2s,transform .2s';el.style.opacity='0';el.style.transform='translateY(-6px)';setTimeout(render,200)}else render();return}
  if(k==='home'){view='home';q='';render();return}
  if(k==='search'){view='search';render();return}
  if(k==='hidesugg'){db.hideSugg=true;save();render();return}
@@ -530,7 +608,7 @@ function addQuick(){const i=$('quick'),t=i.value.trim();i.value='';i.blur();open
 $('quick').addEventListener('keydown',e=>{if(e.key==='Enter')addQuick()});
 $('quickGo').onclick=addQuick;
 $('quick').addEventListener('focus',()=>{if(!$('quick').value){}});
-window.addEventListener('scroll',()=>{$('toTop').style.display=scrollY>600?'grid':'none'});
+window.addEventListener('scroll',()=>{$('toTop').style.display=scrollY>600?'grid':'none';document.body.classList.toggle('scrolled',scrollY>Math.max(140,innerHeight*.26))},{passive:true});
 $('toTop').onclick=()=>scrollTo({top:0,behavior:'smooth'});
 
 // ---------- in-app alerts ----------
@@ -565,7 +643,7 @@ function stopBeep(){clearInterval(beepT);beepT=null}
 let tt;function toast(m){const a=$('alert');a.innerHTML=`<div class="a2" style="margin:0">${esc(m)}</div>`;a.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>{if(!alertCur)a.classList.remove('show')},1800)}
 
 // mark already-past items as notified on first run so old ones don't all pop up
-applyTheme();if(AB){try{window.onAndroidResume()}catch(e){}syncNative()}render();setInterval(()=>{checkDue();if(!editing)render()},15000);setTimeout(checkDue,800);
+applyTheme();if(AB){try{window.onAndroidResume()}catch(e){}syncNative();if(Date.now()-(db.lastUpdCheck||0)>6*36e5)setTimeout(checkUpdates,2500)}render();setInterval(()=>{checkDue();if(!editing)render()},15000);setTimeout(checkDue,800);
 </script>
 </body>
 </html>
