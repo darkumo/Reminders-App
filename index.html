@@ -117,7 +117,7 @@ body.light .cat,body.light .item,body.light .sugg,body.light .field{box-shadow:0
 <div class="menu" id="menu"></div>
 
 <script>
-const VERSION='1.1';
+const VERSION='1.2';
 const AB=window.AndroidBridge||null;
 const ICON={
  today:'<svg width="30" height="30" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3" fill="#ff6b6b"/><rect x="3" y="5" width="18" height="5" rx="2" fill="#ff8585"/><rect x="7" y="2.5" width="2" height="5" rx="1" fill="#ff6b6b"/><rect x="15" y="2.5" width="2" height="5" rx="1" fill="#ff6b6b"/><circle cx="8" cy="14" r="1.6" fill="#fff"/></svg>',
@@ -150,9 +150,13 @@ const BGHEX={purple:'#5b4bd8',blue:'#2f7de1',green:'#1f9d6b',orange:'#f0793a',pi
 let syncT=null;
 function syncNative(){if(!AB)return;clearTimeout(syncT);syncT=setTimeout(()=>{try{
  const now=Date.now(),s=db.settings;
- const items=db.items.filter(x=>!x.done&&x.due&&eff(x)>now-6e4).sort((a,b)=>eff(a)-eff(b)).slice(0,60).map(x=>({id:x.id,title:x.title,body:x.notes||'',at:eff(x)}));
+ const act=db.items.filter(x=>!x.done&&x.due);
+ const fut=act.filter(x=>eff(x)>now).sort((a,b)=>eff(a)-eff(b)).slice(0,60).map(x=>({id:x.id,title:x.title,body:x.notes||'',at:eff(x)}));
+ // overdue, not completed (last 7 days, max 5): stay in the island until completed or deleted
+ const pend=act.filter(x=>eff(x)<=now&&eff(x)>now-7*864e5).sort((a,b)=>eff(b)-eff(a)).slice(0,5).map(x=>({id:x.id,title:x.title,body:'',at:eff(x),pending:true}));
+ const items=fut.concat(pend);
  AB.setSchedule(JSON.stringify({items,full:s.alertType==='full',sound:s.sound,bg:BGHEX[s.alertBg]||'#5b4bd8',lead:+s.liveLead||0,
-  labels:{complete:L('Completar','Complete'),snooze:L('Posponer 10 min','Snooze 10 min'),dismiss:L('Cerrar','Dismiss'),reminder:L('Recordatorio','Reminder'),starts:L('Empieza en','Starts in'),app:L('Recordatorios','Reminders')}}));
+  labels:{complete:L('Completar','Complete'),snooze:L('Posponer 10 min','Snooze 10 min'),dismiss:L('Cerrar','Dismiss'),reminder:L('Recordatorio','Reminder'),starts:L('Empieza en','Starts in'),now:L('Ahora','Now'),app:L('Recordatorios','Reminders')}}));
 }catch(e){}},300)}
 const save=()=>{store.set('rem_db',db);syncNative()};
 const $=id=>document.getElementById(id);
