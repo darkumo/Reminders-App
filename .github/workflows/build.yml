@@ -66,7 +66,7 @@ jobs:
             <uses-permission android:name="android.permission.WAKE_LOCK"/>
             <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
             <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"/>
-            <application android:label="Recordatorios" android:icon="@drawable/ic"
+            <application android:label="Reminders" android:icon="@drawable/ic"
                 android:theme="@android:style/Theme.Material.NoActionBar">
               <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask"
                   android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
@@ -127,6 +127,14 @@ jobs:
                 o.put("id", id); o.put("action", action); o.put("t", System.currentTimeMillis());
                 a.put(o);
                 p(c).edit().putString("actions", a.toString()).apply();
+              } catch (Exception e) { }
+            }
+            static synchronized void addLive(Context c, String id) {
+              try {
+                JSONArray a = new JSONArray(p(c).getString("liveKeys", "[]"));
+                for (int k = 0; k < a.length(); k++) if (id.equals(a.getString(k))) return;
+                a.put(id);
+                p(c).edit().putString("liveKeys", a.toString()).apply();
               } catch (Exception e) { }
             }
             static synchronized String takeActions(Context c) {
@@ -211,6 +219,32 @@ jobs:
               Notification n = b.build();
               if ("long".equals(sound)) n.flags |= Notification.FLAG_INSISTENT;
               try { nm(c).notify(nid(id), n); } catch (SecurityException e) { }
+              if (r.optLong("lead", 0) > 0) pending(c, id, title, at);
+            }
+            // After the reminder time: stays in the island (counting up) until completed or deleted
+            static void pending(Context c, String id, String title, long at) {
+              ensureChannels(c);
+              Notification.Builder b = new Notification.Builder(c, "rem_live")
+                  .setSmallIcon(R.drawable.ic_stat)
+                  .setContentTitle(title)
+                  .setContentText(Store.label(c, "now", "Ahora"))
+                  .setCategory(Notification.CATEGORY_REMINDER)
+                  .setOngoing(true).setOnlyAlertOnce(true)
+                  .setUsesChronometer(true)
+                  .setWhen(at).setShowWhen(true)
+                  .setColor(0xFF8B7BFF)
+                  .setContentIntent(openApp(c))
+                  .addAction(new Notification.Action.Builder(null, Store.label(c, "complete", "Completar"), action(c, "COMPLETE", id, title, "")).build());
+              promote(b, title);
+              try { nm(c).notify(liveId(id), b.build()); } catch (SecurityException e) { }
+              Store.addLive(c, id);
+            }
+            static void promote(Notification.Builder b, String title) {
+              Bundle ex = new Bundle();
+              ex.putBoolean("android.requestPromotedOngoing", true);
+              b.addExtras(ex);
+              try { b.getClass().getMethod("setRequestPromotedOngoing", boolean.class).invoke(b, true); } catch (Throwable t) { }
+              try { b.getClass().getMethod("setShortCriticalText", String.class).invoke(b, title.length() > 12 ? title.substring(0, 12) : title); } catch (Throwable t) { }
             }
             // Countdown shown as an Android 16 Live Update (what HyperOS Super Island reads)
             static void live(Context c, String id, String title, long at) {
@@ -228,12 +262,9 @@ jobs:
                   .setColor(0xFF8B7BFF)
                   .setTimeoutAfter(at - now + 2000)
                   .setContentIntent(openApp(c));
-              Bundle ex = new Bundle();
-              ex.putBoolean("android.requestPromotedOngoing", true);
-              b.addExtras(ex);
-              try { b.getClass().getMethod("setRequestPromotedOngoing", boolean.class).invoke(b, true); } catch (Throwable t) { }
-              try { b.getClass().getMethod("setShortCriticalText", String.class).invoke(b, title.length() > 12 ? title.substring(0, 12) : title); } catch (Throwable t) { }
+              promote(b, title);
               try { nm(c).notify(liveId(id), b.build()); } catch (SecurityException e) { }
+              Store.addLive(c, id);
             }
           }
           EOF
@@ -278,17 +309,26 @@ jobs:
                 JSONArray items = r.optJSONArray("items");
                 long lead = r.optLong("lead", 0) * 60000L, now = System.currentTimeMillis();
                 JSONArray keys = new JSONArray();
+                java.util.HashSet<String> keepLive = new java.util.HashSet<>();
+                JSONArray oldLive = new JSONArray(Store.p(c).getString("liveKeys", "[]"));
+                Store.p(c).edit().putString("liveKeys", "[]").apply();
                 if (items != null) for (int k = 0; k < items.length(); k++) {
                   JSONObject o = items.getJSONObject(k);
                   String id = o.getString("id"), title = o.optString("title"), body = o.optString("body");
                   long t = o.getLong("at");
-                  if (t <= now) continue;
+                  if (t <= now) {
+                    // overdue and not completed: keep it in the island
+                    if (lead > 0 && o.optBoolean("pending")) { Notif.pending(c, id, title, t); keepLive.add(id); }
+                    continue;
+                  }
                   keys.put(id);
                   at(c, id, title, body, t);
-                  if (lead > 0) {
-                    if (t - lead > now) setExact(c, t - lead, pi(c, "LIVE", id, title, body, t, PendingIntent.FLAG_UPDATE_CURRENT));
-                    else Notif.live(c, id, title, t);
-                  } else Notif.nm(c).cancel(Notif.liveId(id));
+                  if (lead > 0 && t - lead <= now) { Notif.live(c, id, title, t); keepLive.add(id); }
+                  else if (lead > 0) setExact(c, t - lead, pi(c, "LIVE", id, title, body, t, PendingIntent.FLAG_UPDATE_CURRENT));
+                }
+                for (int k = 0; k < oldLive.length(); k++) {
+                  String id = oldLive.getString(k);
+                  if (!keepLive.contains(id)) Notif.nm(c).cancel(Notif.liveId(id));
                 }
                 Store.p(c).edit().putString("keys", keys.toString()).apply();
               } catch (Exception e) { }
@@ -320,11 +360,14 @@ jobs:
               String id = i.getStringExtra("id"), act = i.getAction();
               if (id == null || act == null) return;
               Notif.nm(c).cancel(Notif.nid(id));
+              if ("DISMISS".equals(act)) return; // closing the alert keeps it in the island
               Notif.nm(c).cancel(Notif.liveId(id));
-              if ("DISMISS".equals(act)) return;
               Store.addAction(c, id, act);
               if ("SNOOZE".equals(act)) {
-                Scheduler.at(c, id, i.getStringExtra("title"), i.getStringExtra("body"), System.currentTimeMillis() + 600000L);
+                long t = System.currentTimeMillis() + 600000L;
+                String title = i.getStringExtra("title");
+                Scheduler.at(c, id, title, i.getStringExtra("body"), t);
+                if (Store.root(c).optLong("lead", 0) > 0 && title != null) Notif.live(c, id, title, t);
               }
               MainActivity.ping();
             }
