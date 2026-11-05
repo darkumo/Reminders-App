@@ -1,0 +1,575 @@
+name: Construir APK
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Crear proyecto Android
+        run: |
+          P=app/src/main
+          J=$P/java/com/dark/recordatorios
+          mkdir -p $P/assets $J $P/res/drawable
+          cp index.html $P/assets/index.html
+          cat > settings.gradle <<'EOF'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositories { google(); mavenCentral() } }
+          rootProject.name = "Recordatorios"
+          include ':app'
+          EOF
+          echo "plugins { id 'com.android.application' version '8.7.3' apply false }" > build.gradle
+          echo "android.useAndroidX=true" > gradle.properties
+          cat > app/build.gradle <<'EOF'
+          plugins { id 'com.android.application' }
+          def appVer = (rootProject.file('index.html').text =~ /const VERSION='([^']+)'/)[0][1]
+          android {
+            namespace 'com.dark.recordatorios'
+            compileSdk 35
+            defaultConfig {
+              applicationId "com.dark.recordatorios"
+              minSdk 26
+              targetSdk 35
+              versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int)
+              versionName appVer
+            }
+            signingConfigs {
+              debug {
+                storeFile rootProject.file('debug.keystore')
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+              }
+            }
+            lint { abortOnError false; checkReleaseBuilds false }
+          }
+          EOF
+          cat > $P/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="android.permission.INTERNET"/>
+            <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+            <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+            <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+            <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+            <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+            <uses-permission android:name="android.permission.VIBRATE"/>
+            <uses-permission android:name="android.permission.WAKE_LOCK"/>
+            <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+            <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"/>
+            <application android:label="Recordatorios" android:icon="@drawable/ic"
+                android:theme="@android:style/Theme.Material.NoActionBar">
+              <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask"
+                  android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
+                  android:windowSoftInputMode="adjustResize">
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN"/>
+                  <category android:name="android.intent.category.LAUNCHER"/>
+                </intent-filter>
+              </activity>
+              <activity android:name=".AlertActivity" android:exported="false" android:showWhenLocked="true"
+                  android:turnScreenOn="true" android:excludeFromRecents="true" android:launchMode="singleInstance"
+                  android:taskAffinity="com.dark.recordatorios.alert"/>
+              <receiver android:name=".AlarmReceiver" android:exported="false"/>
+              <receiver android:name=".ActionReceiver" android:exported="false"/>
+              <receiver android:name=".BootReceiver" android:exported="true">
+                <intent-filter>
+                  <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                  <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                  <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED"/>
+                </intent-filter>
+              </receiver>
+            </application>
+          </manifest>
+          EOF
+          cat > $P/res/drawable/ic.xml <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+            <path android:fillColor="#2A2647" android:pathData="M12,2h24a10,10 0,0 1,10,10v24a10,10 0,0 1,-10,10h-24a10,10 0,0 1,-10,-10v-24a10,10 0,0 1,10,-10z"/>
+            <path android:fillColor="#8B7BFF" android:pathData="M24,10a12,12 0,1 1,0,24a12,12 0,1 1,0,-24z"/>
+            <path android:fillColor="#FFFFFF" android:pathData="M19.5,22.3l2.9,2.9l6.2,-6.4l1.8,1.8l-8,8.2l-4.7,-4.7z"/>
+          </vector>
+          EOF
+          cat > $P/res/drawable/ic_stat.xml <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+            <path android:fillColor="#FFFFFFFF" android:pathData="M12,22c1.1,0 2,-0.9 2,-2h-4c0,1.1 0.9,2 2,2zM18,16v-5c0,-3.1 -1.6,-5.6 -4.5,-6.3V4c0,-0.8 -0.7,-1.5 -1.5,-1.5s-1.5,0.7 -1.5,1.5v0.7C7.6,5.4 6,7.9 6,11v5l-2,2v1h16v-1l-2,-2z"/>
+          </vector>
+          EOF
+          cat > $J/Store.java <<'EOF'
+          package com.dark.recordatorios;
+          import android.content.Context;
+          import android.content.SharedPreferences;
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+          public class Store {
+            static SharedPreferences p(Context c) { return c.getSharedPreferences("rem", Context.MODE_PRIVATE); }
+            static JSONObject root(Context c) {
+              try { return new JSONObject(p(c).getString("schedule", "{}")); } catch (Exception e) { return new JSONObject(); }
+            }
+            static String label(Context c, String k, String def) {
+              JSONObject l = root(c).optJSONObject("labels");
+              return l == null ? def : l.optString(k, def);
+            }
+            static synchronized void addAction(Context c, String id, String action) {
+              try {
+                JSONArray a = new JSONArray(p(c).getString("actions", "[]"));
+                JSONObject o = new JSONObject();
+                o.put("id", id); o.put("action", action); o.put("t", System.currentTimeMillis());
+                a.put(o);
+                p(c).edit().putString("actions", a.toString()).apply();
+              } catch (Exception e) { }
+            }
+            static synchronized String takeActions(Context c) {
+              String s = p(c).getString("actions", "[]");
+              p(c).edit().putString("actions", "[]").apply();
+              return s;
+            }
+          }
+          EOF
+          cat > $J/Notif.java <<'EOF'
+          package com.dark.recordatorios;
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.PendingIntent;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.media.AudioAttributes;
+          import android.media.RingtoneManager;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import org.json.JSONObject;
+          public class Notif {
+            static NotificationManager nm(Context c) { return (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE); }
+            static void ensureChannels(Context c) {
+              NotificationManager nm = nm(c);
+              String app = Store.label(c, "reminder", "Recordatorio");
+              NotificationChannel a = new NotificationChannel("rem_short", app, NotificationManager.IMPORTANCE_HIGH);
+              a.enableVibration(true); a.setVibrationPattern(new long[]{0, 250, 120, 250});
+              a.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                  new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build());
+              NotificationChannel b = new NotificationChannel("rem_long", app + " (alarma)", NotificationManager.IMPORTANCE_HIGH);
+              b.enableVibration(true); b.setVibrationPattern(new long[]{0, 400, 200, 400, 200, 400});
+              b.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+                  new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build());
+              NotificationChannel s = new NotificationChannel("rem_silent", app + " (silencio)", NotificationManager.IMPORTANCE_HIGH);
+              s.setSound(null, null); s.enableVibration(true);
+              NotificationChannel l = new NotificationChannel("rem_live", "Cuenta regresiva", NotificationManager.IMPORTANCE_DEFAULT);
+              l.setSound(null, null); l.enableVibration(false);
+              nm.createNotificationChannel(a); nm.createNotificationChannel(b);
+              nm.createNotificationChannel(s); nm.createNotificationChannel(l);
+            }
+            static int nid(String id) { return id.hashCode(); }
+            static int liveId(String id) { return ("live" + id).hashCode(); }
+            static PendingIntent openApp(Context c) {
+              Intent i = new Intent(c, MainActivity.class);
+              i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+              return PendingIntent.getActivity(c, 1, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            }
+            static PendingIntent action(Context c, String act, String id, String title, String body) {
+              Intent i = new Intent(c, ActionReceiver.class);
+              i.setAction(act);
+              i.setData(Uri.parse("rem://" + act.toLowerCase() + "/" + Uri.encode(id)));
+              i.putExtra("id", id); i.putExtra("title", title); i.putExtra("body", body);
+              return PendingIntent.getBroadcast(c, 0, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            }
+            static void fire(Context c, String id, String title, String body, long at) {
+              ensureChannels(c);
+              JSONObject r = Store.root(c);
+              String sound = r.optString("sound", "short");
+              String ch = "none".equals(sound) ? "rem_silent" : "long".equals(sound) ? "rem_long" : "rem_short";
+              nm(c).cancel(liveId(id));
+              Notification.Builder b = new Notification.Builder(c, ch)
+                  .setSmallIcon(R.drawable.ic_stat)
+                  .setContentTitle(title)
+                  .setContentText(body == null || body.isEmpty() ? Store.label(c, "reminder", "Recordatorio") : body)
+                  .setCategory(Notification.CATEGORY_REMINDER)
+                  .setAutoCancel(true)
+                  .setWhen(at).setShowWhen(true)
+                  .setColor(0xFF8B7BFF)
+                  .setContentIntent(openApp(c))
+                  .addAction(new Notification.Action.Builder(null, Store.label(c, "complete", "Completar"), action(c, "COMPLETE", id, title, body)).build())
+                  .addAction(new Notification.Action.Builder(null, Store.label(c, "snooze", "Posponer 10 min"), action(c, "SNOOZE", id, title, body)).build());
+              if (body != null && !body.isEmpty()) b.setStyle(new Notification.BigTextStyle().bigText(body));
+              if (r.optBoolean("full", true)) {
+                Intent fi = new Intent(c, AlertActivity.class);
+                fi.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_USER_ACTION);
+                fi.setData(Uri.parse("rem://alert/" + Uri.encode(id)));
+                fi.putExtra("id", id); fi.putExtra("title", title); fi.putExtra("body", body); fi.putExtra("at", at);
+                b.setFullScreenIntent(PendingIntent.getActivity(c, 0, fi, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE), true);
+              }
+              Notification n = b.build();
+              if ("long".equals(sound)) n.flags |= Notification.FLAG_INSISTENT;
+              try { nm(c).notify(nid(id), n); } catch (SecurityException e) { }
+            }
+            // Countdown shown as an Android 16 Live Update (what HyperOS Super Island reads)
+            static void live(Context c, String id, String title, long at) {
+              ensureChannels(c);
+              long now = System.currentTimeMillis();
+              if (at <= now) return;
+              Notification.Builder b = new Notification.Builder(c, "rem_live")
+                  .setSmallIcon(R.drawable.ic_stat)
+                  .setContentTitle(title)
+                  .setContentText(Store.label(c, "starts", "Empieza en"))
+                  .setCategory(Notification.CATEGORY_REMINDER)
+                  .setOngoing(true).setOnlyAlertOnce(true)
+                  .setUsesChronometer(true).setChronometerCountDown(true)
+                  .setWhen(at).setShowWhen(true)
+                  .setColor(0xFF8B7BFF)
+                  .setTimeoutAfter(at - now + 2000)
+                  .setContentIntent(openApp(c));
+              Bundle ex = new Bundle();
+              ex.putBoolean("android.requestPromotedOngoing", true);
+              b.addExtras(ex);
+              try { b.getClass().getMethod("setRequestPromotedOngoing", boolean.class).invoke(b, true); } catch (Throwable t) { }
+              try { b.getClass().getMethod("setShortCriticalText", String.class).invoke(b, title.length() > 12 ? title.substring(0, 12) : title); } catch (Throwable t) { }
+              try { nm(c).notify(liveId(id), b.build()); } catch (SecurityException e) { }
+            }
+          }
+          EOF
+          cat > $J/Scheduler.java <<'EOF'
+          package com.dark.recordatorios;
+          import android.app.AlarmManager;
+          import android.app.PendingIntent;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.net.Uri;
+          import android.os.Build;
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+          public class Scheduler {
+            static PendingIntent pi(Context c, String kind, String id, String title, String body, long at, int flags) {
+              Intent i = new Intent(c, AlarmReceiver.class);
+              i.setAction(kind);
+              i.setData(Uri.parse("rem://" + kind.toLowerCase() + "/" + Uri.encode(id)));
+              i.putExtra("id", id); i.putExtra("title", title); i.putExtra("body", body); i.putExtra("at", at);
+              return PendingIntent.getBroadcast(c, 0, i, flags | PendingIntent.FLAG_IMMUTABLE);
+            }
+            static void setExact(Context c, long t, PendingIntent p) {
+              AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+              if (Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, t, p);
+              else am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, t, p);
+            }
+            static void at(Context c, String id, String title, String body, long t) {
+              setExact(c, t, pi(c, "FIRE", id, title, body, t, PendingIntent.FLAG_UPDATE_CURRENT));
+            }
+            static synchronized void reschedule(Context c) {
+              AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+              try {
+                JSONArray old = new JSONArray(Store.p(c).getString("keys", "[]"));
+                for (int k = 0; k < old.length(); k++) {
+                  String id = old.getString(k);
+                  for (String kind : new String[]{"FIRE", "LIVE"}) {
+                    PendingIntent p = pi(c, kind, id, "", "", 0, PendingIntent.FLAG_NO_CREATE);
+                    if (p != null) { am.cancel(p); p.cancel(); }
+                  }
+                }
+                JSONObject r = Store.root(c);
+                JSONArray items = r.optJSONArray("items");
+                long lead = r.optLong("lead", 0) * 60000L, now = System.currentTimeMillis();
+                JSONArray keys = new JSONArray();
+                if (items != null) for (int k = 0; k < items.length(); k++) {
+                  JSONObject o = items.getJSONObject(k);
+                  String id = o.getString("id"), title = o.optString("title"), body = o.optString("body");
+                  long t = o.getLong("at");
+                  if (t <= now) continue;
+                  keys.put(id);
+                  at(c, id, title, body, t);
+                  if (lead > 0) {
+                    if (t - lead > now) setExact(c, t - lead, pi(c, "LIVE", id, title, body, t, PendingIntent.FLAG_UPDATE_CURRENT));
+                    else Notif.live(c, id, title, t);
+                  } else Notif.nm(c).cancel(Notif.liveId(id));
+                }
+                Store.p(c).edit().putString("keys", keys.toString()).apply();
+              } catch (Exception e) { }
+            }
+          }
+          EOF
+          cat > $J/AlarmReceiver.java <<'EOF'
+          package com.dark.recordatorios;
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+          public class AlarmReceiver extends BroadcastReceiver {
+            @Override public void onReceive(Context c, Intent i) {
+              String id = i.getStringExtra("id"), title = i.getStringExtra("title"), body = i.getStringExtra("body");
+              long at = i.getLongExtra("at", System.currentTimeMillis());
+              if (id == null) return;
+              if ("LIVE".equals(i.getAction())) Notif.live(c, id, title, at);
+              else Notif.fire(c, id, title, body, at);
+            }
+          }
+          EOF
+          cat > $J/ActionReceiver.java <<'EOF'
+          package com.dark.recordatorios;
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+          public class ActionReceiver extends BroadcastReceiver {
+            @Override public void onReceive(Context c, Intent i) {
+              String id = i.getStringExtra("id"), act = i.getAction();
+              if (id == null || act == null) return;
+              Notif.nm(c).cancel(Notif.nid(id));
+              Notif.nm(c).cancel(Notif.liveId(id));
+              if ("DISMISS".equals(act)) return;
+              Store.addAction(c, id, act);
+              if ("SNOOZE".equals(act)) {
+                Scheduler.at(c, id, i.getStringExtra("title"), i.getStringExtra("body"), System.currentTimeMillis() + 600000L);
+              }
+              MainActivity.ping();
+            }
+          }
+          EOF
+          cat > $J/BootReceiver.java <<'EOF'
+          package com.dark.recordatorios;
+          import android.content.BroadcastReceiver;
+          import android.content.Context;
+          import android.content.Intent;
+          public class BootReceiver extends BroadcastReceiver {
+            @Override public void onReceive(Context c, Intent i) { Scheduler.reschedule(c); }
+          }
+          EOF
+          cat > $J/AlertActivity.java <<'EOF'
+          package com.dark.recordatorios;
+          import android.app.Activity;
+          import android.content.Intent;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.view.Gravity;
+          import android.view.WindowManager;
+          import android.widget.Button;
+          import android.widget.LinearLayout;
+          import android.widget.TextView;
+          import java.text.DateFormat;
+          import java.util.Date;
+          public class AlertActivity extends Activity {
+            String id, title, body;
+            @Override protected void onCreate(Bundle s) {
+              super.onCreate(s);
+              if (Build.VERSION.SDK_INT >= 27) { setShowWhenLocked(true); setTurnScreenOn(true); }
+              else getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+              getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+              getWindow().setStatusBarColor(Color.TRANSPARENT);
+              build(getIntent());
+            }
+            @Override protected void onNewIntent(Intent i) { super.onNewIntent(i); build(i); }
+            int dp(float v) { return (int) (v * getResources().getDisplayMetrics().density); }
+            void build(Intent it) {
+              id = it.getStringExtra("id"); title = it.getStringExtra("title"); body = it.getStringExtra("body");
+              long at = it.getLongExtra("at", System.currentTimeMillis());
+              int bg;
+              try { bg = Color.parseColor(Store.root(this).optString("bg", "#5b4bd8")); } catch (Exception e) { bg = 0xFF5B4BD8; }
+              LinearLayout root = new LinearLayout(this);
+              root.setOrientation(LinearLayout.VERTICAL);
+              root.setGravity(Gravity.CENTER_HORIZONTAL);
+              root.setPadding(dp(24), dp(90), dp(24), dp(40));
+              GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{bg, darken(bg)});
+              root.setBackground(g);
+              TextView time = tv(DateFormat.getTimeInstance(DateFormat.SHORT).format(new Date(at)), 60, false);
+              TextView lab = tv(Store.label(this, "reminder", "Recordatorio"), 15, false); lab.setAlpha(.75f);
+              TextView t = tv(title == null ? "" : title, 30, true); t.setPadding(0, dp(36), 0, 0);
+              root.addView(time); root.addView(lab); root.addView(t);
+              if (body != null && !body.isEmpty()) { TextView b = tv(body, 16, false); b.setAlpha(.85f); b.setPadding(0, dp(12), 0, 0); root.addView(b); }
+              LinearLayout sp = new LinearLayout(this);
+              root.addView(sp, new LinearLayout.LayoutParams(1, 0, 1f));
+              root.addView(btn(Store.label(this, "snooze", "Posponer 10 min"), false, "SNOOZE"));
+              root.addView(btn(Store.label(this, "complete", "Completar"), true, "COMPLETE"));
+              root.addView(btn(Store.label(this, "dismiss", "Cerrar"), false, "DISMISS"));
+              setContentView(root);
+            }
+            int darken(int c) { return Color.rgb((int) (Color.red(c) * .25), (int) (Color.green(c) * .25), (int) (Color.blue(c) * .3)); }
+            TextView tv(String s, float sp, boolean bold) {
+              TextView v = new TextView(this);
+              v.setText(s); v.setTextSize(sp); v.setTextColor(Color.WHITE); v.setGravity(Gravity.CENTER);
+              if (bold) v.setTypeface(Typeface.DEFAULT_BOLD);
+              return v;
+            }
+            Button btn(String s, boolean primary, final String act) {
+              Button b = new Button(this);
+              b.setText(s); b.setAllCaps(false); b.setTextSize(17);
+              b.setTextColor(primary ? 0xFF111111 : Color.WHITE);
+              GradientDrawable d = new GradientDrawable();
+              d.setCornerRadius(dp(22)); d.setColor(primary ? Color.WHITE : 0x29FFFFFF);
+              b.setBackground(d);
+              LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56));
+              lp.topMargin = dp(10);
+              b.setLayoutParams(lp);
+              b.setOnClickListener(v -> {
+                Intent i = new Intent(this, ActionReceiver.class);
+                i.setAction(act); i.putExtra("id", id); i.putExtra("title", title); i.putExtra("body", body);
+                sendBroadcast(i);
+                finish();
+              });
+              return b;
+            }
+          }
+          EOF
+          cat > $J/MainActivity.java <<'EOF'
+          package com.dark.recordatorios;
+          import android.Manifest;
+          import android.app.Activity;
+          import android.app.AlarmManager;
+          import android.content.ClipData;
+          import android.content.ClipboardManager;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.pm.PackageManager;
+          import android.graphics.Color;
+          import android.net.Uri;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.os.PowerManager;
+          import android.provider.Settings;
+          import android.view.View;
+          import android.view.WindowInsets;
+          import android.view.WindowInsetsController;
+          import android.webkit.JavascriptInterface;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.widget.FrameLayout;
+          import java.lang.ref.WeakReference;
+          import org.json.JSONObject;
+          public class MainActivity extends Activity {
+            static WeakReference<MainActivity> live = new WeakReference<>(null);
+            WebView w; FrameLayout root;
+            static void ping() {
+              final MainActivity a = live.get();
+              if (a != null) a.runOnUiThread(() -> a.js("window.onAndroidResume&&onAndroidResume()"));
+            }
+            void js(String s) { if (w != null) w.evaluateJavascript(s, null); }
+            @Override protected void onCreate(Bundle b) {
+              super.onCreate(b);
+              live = new WeakReference<>(this);
+              Notif.ensureChannels(this);
+              root = new FrameLayout(this);
+              root.setBackgroundColor(0xFF12111D);
+              w = new WebView(this);
+              w.setBackgroundColor(Color.TRANSPARENT);
+              root.addView(w);
+              setContentView(root);
+              getWindow().setStatusBarColor(Color.TRANSPARENT);
+              getWindow().setNavigationBarColor(Color.TRANSPARENT);
+              if (Build.VERSION.SDK_INT >= 30) getWindow().setDecorFitsSystemWindows(false);
+              else root.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+              root.setOnApplyWindowInsetsListener((v, ins) -> {
+                if (Build.VERSION.SDK_INT >= 30) {
+                  android.graphics.Insets s = ins.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.ime());
+                  v.setPadding(s.left, s.top, s.right, s.bottom);
+                  return WindowInsets.CONSUMED;
+                }
+                v.setPadding(ins.getSystemWindowInsetLeft(), ins.getSystemWindowInsetTop(), ins.getSystemWindowInsetRight(), ins.getSystemWindowInsetBottom());
+                return ins.consumeSystemWindowInsets();
+              });
+              WebSettings st = w.getSettings();
+              st.setJavaScriptEnabled(true);
+              st.setDomStorageEnabled(true);
+              st.setMediaPlaybackRequiresUserGesture(false);
+              w.addJavascriptInterface(new Bridge(), "AndroidBridge");
+              w.setWebViewClient(new WebViewClient());
+              w.loadUrl("file:///android_asset/index.html");
+              if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
+            }
+            @Override protected void onResume() { super.onResume(); live = new WeakReference<>(this); js("window.onAndroidResume&&onAndroidResume()"); }
+            @Override public void onBackPressed() {
+              w.evaluateJavascript("window.onAndroidBack?onAndroidBack():false", v -> { if (!"true".equals(v)) moveTaskToBack(true); });
+            }
+            boolean ignoringBattery() {
+              PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+              return pm.isIgnoringBatteryOptimizations(getPackageName());
+            }
+            class Bridge {
+              @JavascriptInterface public void setSchedule(String json) {
+                Store.p(MainActivity.this).edit().putString("schedule", json).apply();
+                Scheduler.reschedule(MainActivity.this);
+              }
+              @JavascriptInterface public String takeActions() { return Store.takeActions(MainActivity.this); }
+              @JavascriptInterface public void testAlert(String title) {
+                Scheduler.at(MainActivity.this, "__test", title, "", System.currentTimeMillis() + 3000);
+              }
+              @JavascriptInterface public String permStatus() {
+                JSONObject o = new JSONObject();
+                try {
+                  o.put("notif", Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED);
+                  AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+                  o.put("exact", Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms());
+                  o.put("full", Build.VERSION.SDK_INT < 34 || Notif.nm(MainActivity.this).canUseFullScreenIntent());
+                  o.put("battery", ignoringBattery());
+                } catch (Exception e) { }
+                return o.toString();
+              }
+              @JavascriptInterface public void requestPerm(String k) {
+                runOnUiThread(() -> {
+                  try {
+                    Uri pkg = Uri.parse("package:" + getPackageName());
+                    if ("notif".equals(k)) {
+                      if (Build.VERSION.SDK_INT >= 33) requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
+                      Intent i = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                      i.putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+                      if (Build.VERSION.SDK_INT < 33) startActivity(i);
+                    } else if ("exact".equals(k) && Build.VERSION.SDK_INT >= 31) {
+                      startActivity(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, pkg));
+                    } else if ("full".equals(k) && Build.VERSION.SDK_INT >= 34) {
+                      startActivity(new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, pkg));
+                    } else if ("battery".equals(k)) {
+                      startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, pkg));
+                    }
+                  } catch (Exception e) {
+                    try { startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()))); } catch (Exception x) { }
+                  }
+                });
+              }
+              @JavascriptInterface public void setClip(String s) {
+                ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                cm.setPrimaryClip(ClipData.newPlainText("backup", s));
+              }
+              @JavascriptInterface public String getClip() {
+                ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                ClipData c = cm.getPrimaryClip();
+                if (c == null || c.getItemCount() == 0) return "";
+                CharSequence t = c.getItemAt(0).coerceToText(MainActivity.this);
+                return t == null ? "" : t.toString();
+              }
+              @JavascriptInterface public void setBars(String hex, boolean lightIcons) {
+                runOnUiThread(() -> {
+                  try { root.setBackgroundColor(Color.parseColor(hex)); } catch (Exception e) { }
+                  if (Build.VERSION.SDK_INT >= 30) {
+                    WindowInsetsController c = getWindow().getInsetsController();
+                    if (c != null) {
+                      int m = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+                      c.setSystemBarsAppearance(lightIcons ? m : 0, m);
+                    }
+                  } else {
+                    int f = View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+                    if (lightIcons) f |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                    root.setSystemUiVisibility(f);
+                  }
+                });
+              }
+            }
+          }
+          EOF
+      - name: Compilar
+        run: gradle :app:assembleDebug --no-daemon
+      - name: Renombrar
+        run: cp app/build/outputs/apk/debug/app-debug.apk Recordatorios.apk
+      - name: Publicar descarga
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Recordatorios (build ${{ github.run_number }})
+          files: Recordatorios.apk
