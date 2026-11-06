@@ -175,6 +175,8 @@ body.apk .alert{top:calc(12px + var(--sat,0px));transform:translate(-50%,calc(-1
 body.apk .alert.show{transform:translate(-50%,0)}
 body.apk .sheet:not(.open){transform:translateY(calc(105% + var(--kb,0px)))}
 body.apk .full{padding-top:calc(12vh + var(--sat,0px));padding-bottom:calc(6vh + var(--sab,0px))}
+html.locked,html.locked body{overflow:hidden}
+.sheet{overscroll-behavior:contain}
 </style>
 </head>
 <body>
@@ -191,7 +193,7 @@ body.apk .full{padding-top:calc(12vh + var(--sat,0px));padding-bottom:calc(6vh +
 <div class="menu" id="menu"></div>
 
 <script>
-const VERSION='1.8';
+const VERSION='1.9';
 const REPO='https://github.com/darkumo/Reminders-App';
 const AB=window.AndroidBridge||null;
 // the APK tells the page how tall the status bar, nav bar and keyboard are (in px)
@@ -395,8 +397,13 @@ function openEditor(it){
  drawSheet();openScrim();requestAnimationFrame(()=>$('sheet').classList.add('open'));
  setTimeout(()=>{const t=$('eTitle');if(t&&!editing.title)t.focus()},250);
 }
-function openScrim(){const s=$('scrim');s.style.display='block';requestAnimationFrame(()=>s.classList.add('show'))}
-function closeEditor(){const sh=$('sheet'),s=$('scrim');sh.classList.remove('open','drag');sh.style.transform='';s.classList.remove('show');editing=null;setTimeout(()=>{if(!s.classList.contains('show'))s.style.display='none'},230)}
+// while a sheet is open, swipes must not scroll the page behind it
+let sheetLock=false;
+document.addEventListener('touchmove',e=>{if(!sheetLock)return;const sh=e.target.closest&&e.target.closest('.sheet');
+ if(!sh||sh.scrollHeight<=sh.clientHeight+1){if(e.cancelable)e.preventDefault()}},{passive:false});
+function lockPage(on){sheetLock=on;document.documentElement.classList.toggle('locked',on)}
+function openScrim(){lockPage(true);const s=$('scrim');s.style.display='block';requestAnimationFrame(()=>s.classList.add('show'))}
+function closeEditor(){lockPage(false);const sh=$('sheet'),s=$('scrim');sh.classList.remove('open','drag');sh.style.transform='';s.classList.remove('show');editing=null;setTimeout(()=>{if(!s.classList.contains('show'))s.style.display='none'},230)}
 // swipe the sheet down to close it
 (function(){const sh=$('sheet');let y0=null,t0=0,dy=0;
  sh.addEventListener('touchstart',e=>{if(sh.scrollTop>0||e.target.closest('input,textarea,select'))return;y0=e.touches[0].clientY;t0=Date.now();dy=0},{passive:true});
