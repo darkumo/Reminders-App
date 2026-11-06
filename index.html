@@ -177,6 +177,9 @@ body.apk .sheet:not(.open){transform:translateY(calc(105% + var(--kb,0px)))}
 body.apk .full{padding-top:calc(12vh + var(--sat,0px));padding-bottom:calc(6vh + var(--sab,0px))}
 html.locked,html.locked body{overflow:hidden}
 .sheet{overscroll-behavior:contain}
+.leadrow{display:flex;gap:8px;margin-top:8px}
+.leadrow input,.leadrow select{flex:1;min-width:0;background:var(--in);color:var(--tx);border:none;border-radius:14px;padding:10px 12px;font:inherit;font-size:16px}
+.segsm button{white-space:nowrap;font-size:13px;padding-left:4px;padding-right:4px}
 </style>
 </head>
 <body>
@@ -193,7 +196,7 @@ html.locked,html.locked body{overflow:hidden}
 <div class="menu" id="menu"></div>
 
 <script>
-const VERSION='1.9';
+const VERSION='2.0';
 const REPO='https://github.com/darkumo/Reminders-App';
 const AB=window.AndroidBridge||null;
 // the APK tells the page how tall the status bar, nav bar and keyboard are (in px)
@@ -525,7 +528,9 @@ function openSettings(){
  <div class="field"><div class="lbl">${L('Fondo de la alerta','Alert background')}</div><div class="bgs">${Object.entries(BG).map(([k,c])=>`<button data-set="alertBg" data-v="${k}" class="${s.alertBg===k?'on':''}" style="background:${c}" aria-label="${k}"></button>`).join('')}</div>
   <button class="pill" id="sTest" style="margin-top:12px">${L('Probar alerta','Test alert')}</button></div>
  <div class="field"><div class="srow"><div><div>${L('Hora para recordatorios sin hora','Alert time for date-only reminders')}</div><div class="s2">${L('El día del recordatorio','Day of reminder')}</div></div><input type="time" id="sDOT" value="${s.dateOnlyTime}" style="background:var(--in);color:var(--tx);border:none;border-radius:12px;padding:8px 10px;font:500 15px Inter,sans-serif"></div></div>
- ${AB?`<div class="field"><div class="lbl">${L('Cuenta regresiva en la isla antes del recordatorio','Island countdown before the reminder')}</div>${seg('liveLead',[['0',L('No','Off')],['5','5 min'],['15','15 min'],['30','30 min'],['60','1 h']])}</div>
+ ${AB?`<div class="field"><div class="lbl">${L('Cuenta regresiva en la isla antes del recordatorio','Island countdown before the reminder')}</div>${(()=>{const P=[0,1,5,15,30],cu=s.leadCustom||!P.includes(+s.liveLead),v=+s.liveLead||0,inH=v>=60&&v%60===0;
+  return `<div class="seg segsm">${P.map(m=>`<button data-lead="${m}" class="${!cu&&v===m?'on':''}">${m?m+' min':L('No','Off')}</button>`).join('')}<button data-lead="custom" class="${cu?'on':''}">${L('Otro','Custom')}</button></div>`
+  +(cu?`<div class="leadrow"><input id="leadN" type="number" inputmode="numeric" min="1" max="${inH?48:2880}" value="${inH?v/60:(v||10)}"><select id="leadU"><option value="1"${inH?'':' selected'}>${L('minutos','minutes')}</option><option value="60"${inH?' selected':''}>${L('horas','hours')}</option></select></div>`:'')})()}</div>
  <div class="field" id="permBox"></div>`:''}
  <div class="sgh">${L('Nuevos recordatorios','New reminders')}</div>
  <div class="field">${tog('presetTimes',L('Mostrar horas predefinidas','Show preset times'))}
@@ -538,6 +543,10 @@ function openSettings(){
  <div class="acts"><button class="save" id="sOk">${L('Listo','Done')}</button></div>`;
  const sh=$('sheet'),keepScroll=()=>{const y=sh.scrollTop;openSettings();sh.scrollTop=y};
  sh.querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{s[b.dataset.set]=b.dataset.set==='liveLead'?+b.dataset.v:b.dataset.v;save();applyTheme();render();keepScroll()});
+ sh.querySelectorAll('[data-lead]').forEach(b=>b.onclick=()=>{const m=b.dataset.lead;
+  if(m==='custom'){s.leadCustom=true;if(!(+s.liveLead))s.liveLead=10}else{s.leadCustom=false;s.liveLead=+m}save();render();keepScroll()});
+ const setLead=()=>{const n=Math.max(1,Math.round(+$('leadN').value||0)),u=+$('leadU').value;s.liveLead=Math.min(2880,n*u);save();render()};
+ if($('leadN')){$('leadN').onchange=setLead;$('leadU').onchange=setLead}
  sh.querySelectorAll('[data-tog]').forEach(b=>b.onclick=()=>{s[b.dataset.tog]=!s[b.dataset.tog];save();render();keepScroll()});
  $('sDOT').onchange=()=>{s.dateOnlyTime=$('sDOT').value||'09:00';for(const it of db.items)if(it.dateOnly)it.notified=eff(it)<=Date.now();save();render()};
  drawPerms();
