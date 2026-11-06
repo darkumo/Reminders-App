@@ -162,9 +162,23 @@ body.light.glass .menu{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 8px 24px 
 .upd .ul{flex:1;min-width:0;text-align:left;background:none;border:none;color:var(--tx);font:600 13.5px Inter,sans-serif;padding:6px 0;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .upd .ux{flex:none;background:none;border:none;color:var(--mut);font:500 12.5px Inter,sans-serif;padding:6px 8px;cursor:pointer;white-space:nowrap}
 @keyframes updIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.topfade{display:none}
+body.apk .topfade{display:block;position:fixed;top:0;left:0;right:0;height:calc(var(--sat,0px) + 26px);z-index:5;pointer-events:none;
+ background:linear-gradient(180deg,color-mix(in srgb,var(--bg1) 55%,var(--bg2)) 0%,color-mix(in srgb,var(--bg1) 55%,var(--bg2)) 40%,transparent 100%);
+ -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);-webkit-mask-image:linear-gradient(180deg,#000 50%,transparent);mask-image:linear-gradient(180deg,#000 50%,transparent)}
+body.apk{padding-bottom:calc(120px + var(--bot,0px))}
+body.apk .topbar{padding-top:calc(6px + var(--sat,0px))}
+body.apk .fab{bottom:calc(18px + var(--bot,0px))}
+body.apk .top{bottom:calc(92px + var(--bot,0px))}
+body.apk .sheet{bottom:var(--kb,0px);padding-bottom:calc(26px + var(--sbb,0px));max-height:calc(92vh - var(--kb,0px) - var(--sat,0px))}
+body.apk .alert{top:calc(12px + var(--sat,0px));transform:translate(-50%,calc(-140% - 12px - var(--sat,0px)))}
+body.apk .alert.show{transform:translate(-50%,0)}
+body.apk .sheet:not(.open){transform:translateY(calc(105% + var(--kb,0px)))}
+body.apk .full{padding-top:calc(12vh + var(--sat,0px));padding-bottom:calc(6vh + var(--sab,0px))}
 </style>
 </head>
 <body>
+<div class="topfade" aria-hidden="true"></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="lgRefract" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.018" numOctaves="2" seed="7" result="n"/><feGaussianBlur in="n" stdDeviation="2" result="nb"/><feDisplacementMap in="SourceGraphic" in2="nb" scale="22" xChannelSelector="R" yChannelSelector="G"/></filter></svg>
 <div class="bgorbs" aria-hidden="true"></div>
 <div class="wrap" id="app"></div>
@@ -177,9 +191,14 @@ body.light.glass .menu{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 8px 24px 
 <div class="menu" id="menu"></div>
 
 <script>
-const VERSION='1.6';
+const VERSION='1.7';
 const REPO='https://github.com/darkumo/Reminders-App';
 const AB=window.AndroidBridge||null;
+// the APK tells the page how tall the status bar, nav bar and keyboard are (in px)
+window.setInsets=function(t,b,k){const r=document.documentElement.style;
+ r.setProperty('--sat',t+'px');r.setProperty('--sab',b+'px');r.setProperty('--kb',k+'px');r.setProperty('--bot',Math.max(b,k)+'px');r.setProperty('--sbb',(k>0?0:b)+'px');
+ document.body.classList.add('apk');
+ if(k>0){const a=document.activeElement;if(a&&/TEXTAREA|INPUT/.test(a.tagName)&&!a.closest('.fab'))setTimeout(()=>a.scrollIntoView({block:'nearest',behavior:'smooth'}),60)}};
 const ICON={
  today:'<svg width="30" height="30" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3" fill="#ff6b6b"/><rect x="3" y="5" width="18" height="5" rx="2" fill="#ff8585"/><rect x="7" y="2.5" width="2" height="5" rx="1" fill="#ff6b6b"/><rect x="15" y="2.5" width="2" height="5" rx="1" fill="#ff6b6b"/><circle cx="8" cy="14" r="1.6" fill="#fff"/></svg>',
  sched:'<svg width="30" height="30" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#6fb3ff"/><path d="M12 6.5V12h4" stroke="#14233a" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>',
