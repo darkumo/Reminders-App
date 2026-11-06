@@ -191,7 +191,7 @@ body.apk .full{padding-top:calc(12vh + var(--sat,0px));padding-bottom:calc(6vh +
 <div class="menu" id="menu"></div>
 
 <script>
-const VERSION='1.7';
+const VERSION='1.8';
 const REPO='https://github.com/darkumo/Reminders-App';
 const AB=window.AndroidBridge||null;
 // the APK tells the page how tall the status bar, nav bar and keyboard are (in px)
@@ -518,7 +518,7 @@ function openSettings(){
  <div class="field"><div class="lbl">${L('Fondo de la alerta','Alert background')}</div><div class="bgs">${Object.entries(BG).map(([k,c])=>`<button data-set="alertBg" data-v="${k}" class="${s.alertBg===k?'on':''}" style="background:${c}" aria-label="${k}"></button>`).join('')}</div>
   <button class="pill" id="sTest" style="margin-top:12px">${L('Probar alerta','Test alert')}</button></div>
  <div class="field"><div class="srow"><div><div>${L('Hora para recordatorios sin hora','Alert time for date-only reminders')}</div><div class="s2">${L('El día del recordatorio','Day of reminder')}</div></div><input type="time" id="sDOT" value="${s.dateOnlyTime}" style="background:var(--in);color:var(--tx);border:none;border-radius:12px;padding:8px 10px;font:500 15px Inter,sans-serif"></div></div>
- ${AB?`<div class="field"><div class="lbl">${L('Aviso en la isla antes del recordatorio','Island countdown before the reminder')}</div>${seg('liveLead',[['0',L('No','Off')],['5','5 min'],['15','15 min'],['30','30 min'],['60','1 h']])}</div>
+ ${AB?`<div class="field"><div class="lbl">${L('Cuenta regresiva en la isla antes del recordatorio','Island countdown before the reminder')}</div>${seg('liveLead',[['0',L('No','Off')],['5','5 min'],['15','15 min'],['30','30 min'],['60','1 h']])}</div>
  <div class="field" id="permBox"></div>`:''}
  <div class="sgh">${L('Nuevos recordatorios','New reminders')}</div>
  <div class="field">${tog('presetTimes',L('Mostrar horas predefinidas','Show preset times'))}
