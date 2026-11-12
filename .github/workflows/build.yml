@@ -219,7 +219,7 @@ jobs:
               Notification n = b.build();
               if ("long".equals(sound)) n.flags |= Notification.FLAG_INSISTENT;
               try { nm(c).notify(nid(id), n); } catch (SecurityException e) { }
-              if (r.optLong("lead", 0) > 0) pending(c, id, title, at);
+              pending(c, id, title, at); // always stays in the island after its time, even without a countdown
             }
             // After the reminder time: stays in the island (counting up) until completed or deleted
             static void pending(Context c, String id, String title, long at) {
@@ -294,6 +294,14 @@ jobs:
             static void at(Context c, String id, String title, String body, long t) {
               setExact(c, t, pi(c, "FIRE", id, title, body, t, PendingIntent.FLAG_UPDATE_CURRENT));
             }
+            static boolean repeats(Context c, String id) {
+              JSONArray items = Store.root(c).optJSONArray("items");
+              if (items != null) for (int k = 0; k < items.length(); k++) {
+                JSONObject o = items.optJSONObject(k);
+                if (o != null && id.equals(o.optString("id")) && o.has("nx")) return true;
+              }
+              return false;
+            }
             static synchronized void reschedule(Context c) {
               AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
               try {
@@ -316,9 +324,22 @@ jobs:
                   JSONObject o = items.getJSONObject(k);
                   String id = o.getString("id"), title = o.optString("title"), body = o.optString("body");
                   long t = o.getLong("at");
+                  JSONArray nx = o.optJSONArray("nx");
+                  if (nx != null) {
+                    // repeating: the latest time that passed stays pending in the island, the next one rings
+                    long last = t <= now ? t : 0, next = t > now ? t : 0;
+                    for (int q = 0; q < nx.length(); q++) {
+                      long x = nx.getLong(q);
+                      if (x <= now) last = Math.max(last, x);
+                      else if (next == 0 || x < next) next = x;
+                    }
+                    if (last > 0) { Notif.pending(c, id, title, last); keepLive.add(id); }
+                    if (next == 0) continue;
+                    t = next;
+                  }
                   if (t <= now) {
                     // overdue and not completed: keep it in the island
-                    if (lead > 0 && o.optBoolean("pending")) { Notif.pending(c, id, title, t); keepLive.add(id); }
+                    if (o.optBoolean("pending")) { Notif.pending(c, id, title, t); keepLive.add(id); }
                     continue;
                   }
                   keys.put(id);
@@ -346,7 +367,11 @@ jobs:
               long at = i.getLongExtra("at", System.currentTimeMillis());
               if (id == null) return;
               if ("LIVE".equals(i.getAction())) Notif.live(c, id, title, at);
-              else Notif.fire(c, id, title, body, at);
+              else {
+                Notif.fire(c, id, title, body, at);
+                // a repeating reminder sets up its next time right away, even if the app stays closed
+                if (Scheduler.repeats(c, id)) Scheduler.reschedule(c);
+              }
             }
           }
           EOF
