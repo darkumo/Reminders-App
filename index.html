@@ -127,10 +127,10 @@ body.scrolled .topbar{transform:none;border-bottom-color:var(--ln)}
 /* ---------- glass styles ---------- */
 .bgorbs{display:none}
 body.glass .bgorbs{display:block;position:fixed;inset:0;z-index:-1;pointer-events:none;
- background:radial-gradient(40% 30% at 18% 22%,rgba(139,123,255,.55),transparent 70%),radial-gradient(35% 28% at 85% 40%,rgba(79,209,197,.35),transparent 70%),radial-gradient(45% 35% at 50% 92%,rgba(224,80,143,.35),transparent 70%)}
+ background:radial-gradient(40% 30% at 18% 22%,var(--o1,rgba(139,123,255,.55)),transparent 70%),radial-gradient(35% 28% at 85% 40%,var(--o2,rgba(79,209,197,.35)),transparent 70%),radial-gradient(45% 35% at 50% 92%,var(--o3,rgba(224,80,143,.35)),transparent 70%)}
 body.light.glass .bgorbs{opacity:.7}
-body.glass{--gl:rgba(30,30,44,.42);--gl2:rgba(40,40,58,.55);--gb:rgba(255,255,255,.10)}
-body.light.glass{--gl:rgba(255,255,255,.50);--gl2:rgba(255,255,255,.68);--gb:rgba(255,255,255,.65)}
+body.glass{--gl:rgba(28,28,42,.68);--gl2:rgba(40,40,58,.62);--gb:rgba(255,255,255,.10)}
+body.light.glass{--gl:rgba(255,255,255,.74);--gl2:rgba(255,255,255,.76);--gb:rgba(255,255,255,.65)}
 body.glass .fab,body.glass .menu,body.glass .topbar,body.glass .alert,body.glass .top{background:var(--gl2);border:1px solid var(--gb);
  -webkit-backdrop-filter:blur(22px) saturate(170%);backdrop-filter:blur(22px) saturate(170%)}
 body.glass .sheet{background:var(--gl2);-webkit-backdrop-filter:blur(28px) saturate(170%);backdrop-filter:blur(28px) saturate(170%);border-top:1px solid var(--gb)}
@@ -180,6 +180,9 @@ html.locked,html.locked body{overflow:hidden}
 .leadrow{display:flex;gap:8px;margin-top:8px}
 .leadrow input,.leadrow select{flex:1;min-width:0;background:var(--in);color:var(--tx);border:none;border-radius:14px;padding:10px 12px;font:inherit;font-size:16px}
 .segsm button{white-space:nowrap;font-size:13px;padding-left:4px;padding-right:4px}
+.zrow{display:flex;align-items:center;gap:8px}.zrow .pill{min-width:44px;font-size:18px;padding:4px 0}.zrow span{min-width:46px;text-align:center}
+.cols{flex-wrap:nowrap;gap:6px}.cols button{width:34px;height:34px;flex:none}
+.rng{width:100%;accent-color:var(--acc);margin-top:6px}
 </style>
 </head>
 <body>
@@ -196,11 +199,11 @@ html.locked,html.locked body{overflow:hidden}
 <div class="menu" id="menu"></div>
 
 <script>
-const VERSION='2.0';
+const VERSION='2.1.1';
 const REPO='https://github.com/darkumo/Reminders-App';
 const AB=window.AndroidBridge||null;
 // the APK tells the page how tall the status bar, nav bar and keyboard are (in px)
-window.setInsets=function(t,b,k){const r=document.documentElement.style;
+window.setInsets=function(t,b,k){lastIns=[t,b,k];const r=document.documentElement.style,zz=Math.min(130,Math.max(70,(db&&db.settings&&db.settings.zoom)||100))/100;t/=zz;b/=zz;k/=zz;
  r.setProperty('--sat',t+'px');r.setProperty('--sab',b+'px');r.setProperty('--kb',k+'px');r.setProperty('--bot',Math.max(b,k)+'px');r.setProperty('--sbb',(k>0?0:b)+'px');
  document.body.classList.add('apk');
  if(k>0){const a=document.activeElement;if(a&&/TEXTAREA|INPUT/.test(a.tagName)&&!a.closest('.fab'))setTimeout(()=>a.scrollIntoView({block:'nearest',behavior:'smooth'}),60)}};
@@ -236,11 +239,15 @@ const BGHEX={purple:'#5b4bd8',blue:'#2f7de1',green:'#1f9d6b',orange:'#f0793a',pi
 let syncT=null;
 function syncNative(){if(!AB)return;clearTimeout(syncT);syncT=setTimeout(()=>{try{
  const now=Date.now(),s=db.settings;
+ const isRep=x=>x.repeat&&x.repeat.type!=='none';
  const act=db.items.filter(x=>!x.done&&x.due);
- const fut=act.filter(x=>eff(x)>now).sort((a,b)=>eff(a)-eff(b)).slice(0,60).map(x=>({id:x.id,title:x.title,body:x.notes||'',at:eff(x)}));
+ // repeating: current time plus the next ones; the phone keeps the passed one pending and rings the next
+ const reps=act.filter(isRep).map(x=>({id:x.id,title:x.title,body:x.notes||'',at:eff(x),nx:upcoming(x)}));
+ const one=act.filter(x=>!isRep(x));
+ const fut=one.filter(x=>eff(x)>now).sort((a,b)=>eff(a)-eff(b)).slice(0,60).map(x=>({id:x.id,title:x.title,body:x.notes||'',at:eff(x)}));
  // overdue, not completed (last 7 days, max 5): stay in the island until completed or deleted
- const pend=act.filter(x=>eff(x)<=now&&eff(x)>now-7*864e5).sort((a,b)=>eff(b)-eff(a)).slice(0,5).map(x=>({id:x.id,title:x.title,body:'',at:eff(x),pending:true}));
- const items=fut.concat(pend);
+ const pend=one.filter(x=>eff(x)<=now&&eff(x)>now-7*864e5).sort((a,b)=>eff(b)-eff(a)).slice(0,5).map(x=>({id:x.id,title:x.title,body:'',at:eff(x),pending:true}));
+ const items=reps.concat(fut,pend);
  AB.setSchedule(JSON.stringify({items,full:s.alertType==='full',sound:s.sound,bg:BGHEX[s.alertBg]||'#5b4bd8',lead:+s.liveLead||0,
   labels:{complete:L('Completar','Complete'),snooze:L('Posponer 10 min','Snooze 10 min'),dismiss:L('Cerrar','Dismiss'),reminder:L('Recordatorio','Reminder'),starts:L('Empieza en','Starts in'),now:L('Ahora','Now'),app:L('Recordatorios','Reminders')}}));
 }catch(e){}},300)}
@@ -291,6 +298,17 @@ function nextOcc(it){
  return null;
 }
 
+// a repeating reminder that wasn't completed moves on to its latest occurrence that already passed:
+// it rings again each time, and there's only one to mark no matter how many were missed
+function rollRepeats(){const now=Date.now();let ch=false;
+ for(const it of db.items){if(it.done||!it.due||!it.repeat||it.repeat.type==='none')continue;
+  let g=0,nx=nextOcc(it);
+  while(nx&&eff({...it,due:nx})<=now&&g++<3000){it.due=nx;nx=nextOcc(it);ch=true;it.notified=false}}
+ return ch}
+// upcoming alert times of a repeating reminder (for the phone to ring even if the app stays closed)
+function upcoming(it){const out=[],lim=Date.now()+120*864e5;let x={...it},g=0;
+ while(out.length<24&&g++<400){const n=nextOcc(x);if(!n)break;x={...x,due:n};const t=eff(x);if(t>lim)break;if(t>Date.now())out.push(t)}
+ return out}
 // ---------- data ops ----------
 const uid=()=>Math.random().toString(36).slice(2,10);
 function complete(id){
@@ -448,8 +466,26 @@ function drawSheet(){
  if($('eDel'))$('eDel').onclick=()=>{const it=db.items.find(x=>x.id===e.id);db.items=db.items.filter(x=>x.id!==e.id);if(db.settings.trash&&it)db.trash.push({...it,deletedAt:Date.now()});save();closeEditor();render();toast(db.settings.trash?L('Movido a la papelera','Moved to trash'):L('Eliminado','Deleted'))};
  if($('eCancel'))$('eCancel').onclick=closeEditor;
 }
+// colour themes: accent, background glow and the frosted-blur orbs
+const COLORS={
+ purple:{n:['Morado','Purple'],acc:['#8b7bff','#6f5cf5'],bg:['#2a2647','#e4e0ff'],o:['rgba(139,123,255,.55)','rgba(79,209,197,.35)','rgba(224,80,143,.35)']},
+ blue:{n:['Azul','Blue'],acc:['#5aa2ff','#2f7de1'],bg:['#1b2a47','#dde9ff'],o:['rgba(70,140,255,.55)','rgba(79,209,197,.35)','rgba(120,110,255,.30)']},
+ teal:{n:['Turquesa','Teal'],acc:['#2fd3bd','#109c8a'],bg:['#163a3a','#d6f5f0'],o:['rgba(40,200,180,.50)','rgba(70,140,255,.30)','rgba(120,220,140,.28)']},
+ green:{n:['Verde','Green'],acc:['#4ccf7a','#1f9d55'],bg:['#1b3a26','#dcf5e3'],o:['rgba(70,200,110,.48)','rgba(200,220,80,.25)','rgba(40,180,170,.30)']},
+ orange:{n:['Naranja','Orange'],acc:['#ff9a4d','#e8731f'],bg:['#45291a','#ffe9d8'],o:['rgba(255,140,60,.50)','rgba(255,90,90,.28)','rgba(255,200,80,.30)']},
+ pink:{n:['Rosa','Pink'],acc:['#ff6fae','#e0508f'],bg:['#45203a','#ffe0ee'],o:['rgba(255,100,170,.50)','rgba(170,110,255,.30)','rgba(255,150,120,.30)']},
+ red:{n:['Rojo','Red'],acc:['#ff6767','#dc3f3f'],bg:['#451f22','#ffe0e0'],o:['rgba(255,80,80,.48)','rgba(255,150,60,.28)','rgba(200,60,140,.30)']},
+ gray:{n:['Gris','Gray'],acc:['#b0b4c0','#5d6270'],bg:['#2a2c33','#e8e9ee'],o:['rgba(160,165,185,.40)','rgba(120,130,160,.30)','rgba(180,170,190,.28)']}};
+function applyColor(dark){const c=COLORS[db.settings.color]||COLORS.purple,i=dark?0:1,st=document.body.style;
+ // card opacity for Frosted blur (Today, Scheduled… and the reminders)
+ const a=Math.min(100,Math.max(20,db.settings.cardOp||(dark?68:74)))/100;st.setProperty('--gl',dark?`rgba(28,28,42,${a})`:`rgba(255,255,255,${a})`);
+ st.setProperty('--acc',c.acc[i]);st.setProperty('--bg1',c.bg[i]);c.o.forEach((v,k)=>st.setProperty('--o'+(k+1),v))}
+// interface size, 70% to 130%: the whole page scales; the phone's bar sizes are scaled back so they stay right
+let lastIns=null;
+function applyZoom(){const z=Math.min(130,Math.max(70,db.settings.zoom||100))/100;document.documentElement.style.zoom=z===1?'':z;if(lastIns)window.setInsets(...lastIns)}
 function applyTheme(){
  const t=db.settings.theme,dark=t==='dark'||(t==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);
+ applyColor(dark);applyZoom();
  document.body.classList.toggle('light',!dark);
  document.body.classList.toggle('g-frost',db.settings.glass==='frost');document.body.classList.toggle('glass',db.settings.glass!=='none');
  document.querySelector('meta[name=theme-color]').content=dark?'#0f0f18':'#f5f5f8';
@@ -464,6 +500,7 @@ function drawPerms(){const box=$('permBox');if(!box||!AB)return;let st={};try{st
  box.querySelectorAll('[data-perm]').forEach(b=>b.onclick=()=>{AB.requestPerm(b.dataset.perm)});}
 window.onAndroidResume=function(){
  try{if(db.settings.updNotice&&Date.now()-(db.lastUpdCheck||0)>6*36e5)setTimeout(checkUpdates,1500)}catch(e){}
+ rollRepeats();
  let acts=[];try{acts=JSON.parse(AB.takeActions()||'[]')}catch(e){}
  for(const a of acts){const it=db.items.find(x=>x.id===a.id);if(!it||it.done)continue;
   if(a.action==='COMPLETE')complete(it.id);
@@ -521,7 +558,10 @@ function openSettings(){
  $('sheet').innerHTML=`<div class="grab"></div><h3>${L('Ajustes','Settings')}</h3>
  <div class="field"><div class="lbl">${L('Idioma','Language')}</div>${seg('lang',[['auto',L('Del teléfono','Device')],['es','Español'],['en','English']])}</div>
  <div class="field"><div class="lbl">${L('Tema','Theme')}</div>${seg('theme',[['light',L('Día','Light')],['dark',L('Noche','Dark')],['auto',L('Automático','System')]])}
-  <div class="lbl" style="margin-top:12px">${L('Estilo','Style')}</div>${seg('glass',[['none',L('Clásico','Classic')],['frost',L('Cristal difuminado','Frosted blur')]])}</div>
+  <div class="lbl" style="margin-top:12px">${L('Estilo','Style')}</div>${seg('glass',[['none',L('Clásico','Classic')],['frost',L('Cristal difuminado','Frosted blur')]])}
+  <div class="lbl" style="margin-top:12px">${L('Color','Colour')}</div><div class="bgs cols">${Object.entries(COLORS).map(([k,c])=>`<button data-set="color" data-v="${k}" class="${(s.color||'purple')===k?'on':''}" style="background:${c.acc[0]}" aria-label="${L(c.n[0],c.n[1])}" title="${L(c.n[0],c.n[1])}"></button>`).join('')}</div>
+  ${s.glass==='frost'?`<div class="lbl" style="margin-top:12px">${L('Opacidad de las tarjetas','Card opacity')} <span id="opv">${s.cardOp||68}%</span></div><input type="range" id="sOp" min="20" max="100" step="2" value="${s.cardOp||68}" class="rng">`:''}
+  <div class="srow" style="margin-top:12px"><div>${L('Tamaño de la interfaz','Interface size')}</div><div class="zrow"><button class="pill" data-zoom="-1">−</button><span>${s.zoom||100}%</span><button class="pill" data-zoom="1">+</button></div></div></div>
  <div class="sgh">${L('Alertas','Alerts')}</div>
  <div class="field"><div class="lbl">${L('Tipo de alerta','Alert type')}</div>${seg('alertType',[['full',L('Pantalla completa','Full screen')],['banner',L('Notificación','Notification')]])}
   <div class="lbl" style="margin-top:12px">${L('Sonido','Sound')}</div>${seg('sound',[['none',L('Sin sonido','None')],['short',L('Corto','Short')],['long',L('Largo','Long')]])}</div>
@@ -543,6 +583,9 @@ function openSettings(){
  <div class="acts"><button class="save" id="sOk">${L('Listo','Done')}</button></div>`;
  const sh=$('sheet'),keepScroll=()=>{const y=sh.scrollTop;openSettings();sh.scrollTop=y};
  sh.querySelectorAll('[data-set]').forEach(b=>b.onclick=()=>{s[b.dataset.set]=b.dataset.set==='liveLead'?+b.dataset.v:b.dataset.v;save();applyTheme();render();keepScroll()});
+ if($('sOp'))$('sOp').oninput=e=>{s.cardOp=+e.target.value;$('opv').textContent=s.cardOp+'%';applyTheme();save()};
+ sh.querySelectorAll('[data-zoom]').forEach(b=>b.onclick=()=>{const y0=b.getBoundingClientRect().top;s.zoom=Math.min(130,Math.max(70,(s.zoom||100)+10*(+b.dataset.zoom)));save();applyZoom();keepScroll();
+  const nb=sh.querySelector(`[data-zoom="${b.dataset.zoom}"]`);if(nb)sh.scrollTop+=nb.getBoundingClientRect().top-y0});
  sh.querySelectorAll('[data-lead]').forEach(b=>b.onclick=()=>{const m=b.dataset.lead;
   if(m==='custom'){s.leadCustom=true;if(!(+s.liveLead))s.liveLead=10}else{s.leadCustom=false;s.liveLead=+m}save();render();keepScroll()});
  const setLead=()=>{const n=Math.max(1,Math.round(+$('leadN').value||0)),u=+$('leadU').value;s.liveLead=Math.min(2880,n*u);save();render()};
@@ -577,7 +620,7 @@ $('app').addEventListener('click',ev=>{
  if(k==='clearDone'){db.items=db.items.filter(x=>!x.done);save();render();return}
  if(k==='more'){if(menuOpen()){closeMenu();return}const m=$('menu'),r=a.getBoundingClientRect();
   m.innerHTML=`<button data-m="settings">${L('Ajustes','Settings')}</button>${db.settings.trash?`<button data-m="trash">${L('Papelera','Trash')}</button>`:''}<button data-m="sugg">${db.hideSugg?L('Mostrar sugerencias','Show suggestions'):L('Ocultar sugerencias','Hide suggestions')}</button><button data-m="export">${L('Copiar copia de seguridad','Copy backup')}</button><button data-m="import">${L('Restaurar copia','Restore backup')}</button><button data-m="about">${L('Acerca de','About')}</button>`;
-  m.style.display='block';m.style.top=(r.bottom+4)+'px';m.style.left=Math.max(8,r.right-220)+'px';requestAnimationFrame(()=>m.classList.add('show'));return}
+  m.style.display='block';const z=+document.documentElement.style.zoom||1;m.style.top=((r.bottom+4)/z)+'px';m.style.left=Math.max(8,r.right/z-220)+'px';requestAnimationFrame(()=>m.classList.add('show'));return}
 });
 function menuOpen(){return $('menu').style.display==='block'}
 function closeMenu(){const m=$('menu');if(!menuOpen())return;m.classList.remove('show');setTimeout(()=>{if(!m.classList.contains('show'))m.style.display='none'},170)}
@@ -649,7 +692,7 @@ $('toTop').onclick=()=>scrollTo({top:0,behavior:'smooth'});
 // ---------- in-app alerts ----------
 let alertQ=[],alertCur=null;
 function checkDue(){
- const now=Date.now();
+ rollRepeats();const now=Date.now();
  for(const it of db.items)if(!it.done&&it.due&&eff(it)<=now&&!it.notified){it.notified=true;if(!AB)alertQ.push(it.id)}
  save();if(!alertCur)showNext();
 }
@@ -678,7 +721,7 @@ function stopBeep(){clearInterval(beepT);beepT=null}
 let tt;function toast(m){const a=$('alert');a.innerHTML=`<div class="a2" style="margin:0">${esc(m)}</div>`;a.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>{if(!alertCur)a.classList.remove('show')},1800)}
 
 // mark already-past items as notified on first run so old ones don't all pop up
-applyTheme();if(AB){try{window.onAndroidResume()}catch(e){}syncNative();if(Date.now()-(db.lastUpdCheck||0)>6*36e5)setTimeout(checkUpdates,2500)}render();setInterval(()=>{checkDue();if(!editing)render()},15000);setTimeout(checkDue,800);
+rollRepeats();applyTheme();if(AB){try{window.onAndroidResume()}catch(e){}syncNative();if(Date.now()-(db.lastUpdCheck||0)>6*36e5)setTimeout(checkUpdates,2500)}render();setInterval(()=>{checkDue();if(!editing)render()},15000);setTimeout(checkDue,800);
 </script>
 </body>
 </html>
