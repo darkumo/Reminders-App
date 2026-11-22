@@ -302,7 +302,9 @@ jobs:
               }
               return false;
             }
-            static synchronized void reschedule(Context c) {
+            static void reschedule(Context c) { reschedule(c, null); }
+            // fired: the repeating reminder that just rang (only that one gets its "pending" in the island)
+            static synchronized void reschedule(Context c, String fired) {
               AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
               try {
                 JSONArray old = new JSONArray(Store.p(c).getString("keys", "[]"));
@@ -319,6 +321,8 @@ jobs:
                 JSONArray keys = new JSONArray();
                 java.util.HashSet<String> keepLive = new java.util.HashSet<>();
                 JSONArray oldLive = new JSONArray(Store.p(c).getString("liveKeys", "[]"));
+                java.util.HashSet<String> showing = new java.util.HashSet<>();
+                for (int k = 0; k < oldLive.length(); k++) showing.add(oldLive.getString(k));
                 Store.p(c).edit().putString("liveKeys", "[]").apply();
                 if (items != null) for (int k = 0; k < items.length(); k++) {
                   JSONObject o = items.getJSONObject(k);
@@ -333,7 +337,9 @@ jobs:
                       if (x <= now) last = Math.max(last, x);
                       else if (next == 0 || x < next) next = x;
                     }
-                    if (last > 0) { Notif.pending(c, id, title, last); keepLive.add(id); }
+                    // a missed time stays pending only if it is the one ringing now or already in the island;
+                    // others (other days, or completed from the notification) are not brought back
+                    if (last > 0 && (id.equals(fired) || showing.contains(id))) { Notif.pending(c, id, title, last); keepLive.add(id); }
                     if (next == 0) continue;
                     t = next;
                   }
@@ -370,7 +376,7 @@ jobs:
               else {
                 Notif.fire(c, id, title, body, at);
                 // a repeating reminder sets up its next time right away, even if the app stays closed
-                if (Scheduler.repeats(c, id)) Scheduler.reschedule(c);
+                if (Scheduler.repeats(c, id)) Scheduler.reschedule(c, id);
               }
             }
           }
